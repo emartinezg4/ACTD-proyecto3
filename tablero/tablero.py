@@ -1,5 +1,6 @@
 from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
+import dash_table
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -78,12 +79,23 @@ def plot_punt_global_correlations(df):
     fig.update_layout(yaxis={'categoryorder': 'total ascending'}, height=1000, width=1200)
     return fig
 
+# Function to get correlation data as DataFrame
+def get_punt_global_correlations(df):
+    numerical_df = df.select_dtypes(include=['float64', 'int64'])
+    columns_to_exclude = [col for col in numerical_df.columns if col.startswith('punt_') and col != 'punt_global']
+    numerical_df = numerical_df.drop(columns=columns_to_exclude)
+    correlations = numerical_df.corr()['punt_global'].drop('punt_global').sort_values(ascending=False)
+    corr_df = correlations.reset_index()
+    corr_df.columns = ['Variable', 'Correlation']
+    return corr_df
+
 app = Dash(__name__)
 
 app.layout = html.Div([
     dcc.Tabs(id="tabs", value='tab-1', children=[
         dcc.Tab(label='Predicciones vs Valores Reales', value='tab-1'),
         dcc.Tab(label='Correlaciones con punt_global', value='tab-2'),
+        dcc.Tab(label='Tabla de Correlaciones', value='tab-3'),
     ]),
     html.Div(id='tabs-content')
 ])
@@ -100,6 +112,26 @@ def render_content(tab):
     elif tab == 'tab-2':
         return html.Div([
             dcc.Graph(figure=plot_punt_global_correlations(puntajes_pacifico)),
+        ])
+    elif tab == 'tab-3':
+        corr_df = get_punt_global_correlations(puntajes_pacifico)
+        return html.Div([
+            html.H3('Correlaciones con punt_global'),
+            dash_table.DataTable(
+                data=corr_df.to_dict('records'),
+                columns=[{'name': i, 'id': i} for i in corr_df.columns],
+                style_table={'overflowX': 'auto'},
+                style_header={
+                    'backgroundColor': 'rgb(230, 230, 230)',
+                    'fontWeight': 'bold'
+                },
+                style_cell={
+                    'textAlign': 'left',
+                    'minWidth': '150px',
+                    'width': '150px',
+                    'maxWidth': '150px',
+                }
+            )
         ])
 
 if __name__ == '__main__':
